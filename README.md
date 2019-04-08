@@ -1,5 +1,7 @@
 # namedthreads
 
+![](https://api.travis-ci.org/beniwohli/namedthreads.svg?branch=master)
+
 This is a hack to propagate thread names set in Python to the system.
 
 *WARNING*: This is only meant for testing/debugging purposes. Do *NOT* run in production.
