@@ -1,0 +1,1 @@
+import os, sys; os.environ.get('NAMEDTHREADS') and __import__('namedthreads') and sys.modules['namedthreads'].patch()

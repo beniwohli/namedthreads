@@ -1,0 +1,3 @@
+include namedthreads-init.pth
+include LICENSE
+include README.md
