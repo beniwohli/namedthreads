@@ -1,11 +1,40 @@
+import ctypes
 import unittest
 import sys
 import time
-import os
 
 
-def target():
-    time.sleep(0.5)
+def get_thread_name():
+    import namedthreads
+
+    libpthread = namedthreads._get_libpthread()
+    thread_id = namedthreads._get_thread_id(libpthread)
+
+    pthread_getname_np = libpthread.pthread_getname_np
+
+    pthread_getname_np.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
+    pthread_getname_np.restype = ctypes.c_int
+
+    name_buf = (ctypes.c_ubyte * 16)(0)
+    name_buf_ptr = ctypes.cast(name_buf, ctypes.c_char_p)
+    name_buf_size = ctypes.c_size_t(16)
+
+    pthread_getname_np(thread_id, name_buf_ptr, name_buf_size)
+    s = ctypes.cast(
+        name_buf_ptr, ctypes.POINTER(ctypes.c_char * name_buf_size.value)
+    ).contents
+    return s.value.decode("ascii", "replace")
+
+
+class ThreadBase(object):
+    """Thread for testing the OS-visible name was set"""
+
+    def __init__(self, name):
+        super(ThreadBase, self).__init__(name=name)
+        self.os_thread_name = None
+
+    def run(self):
+        self.os_thread_name = get_thread_name()
 
 
 class TestThreadNames(unittest.TestCase):
@@ -17,43 +46,38 @@ class TestThreadNames(unittest.TestCase):
 
     def test_unpatched(self):
         import threading
+
         self.assertFalse(hasattr(threading.Thread.start, "_namedthreads_patched"))
-        thread = threading.Thread(target=target, name="mysupersleepythread")
+
+        class ThreadClass(ThreadBase, threading.Thread):
+            pass
+
+        thread = ThreadClass(name="mysupersleepythread")
         thread.start()
-        # wait_for_thread(thread)
-        thread_status = get_thread_status()
-        self.assertNotIn("mysupersleepythread", thread_status)
+        time.sleep(1)
+
+        self.assertNotIn("mysuper", thread.os_thread_name)
         thread.join()
 
     def test_patched(self):
         import namedthreads
+
         self.assertTrue(namedthreads.patch())
 
         import threading
 
-        self.assertTrue(hasattr(threading.Thread.start, "_namedthreads_patched"))
-        thread = threading.Thread(target=target, name="mysupersleepythread")
+        self.assertTrue(hasattr(threading.Thread, "_namedthreads_patched"))
+
+        class ThreadClass(ThreadBase, threading.Thread):
+            pass
+
+        thread = ThreadClass(name="mysupersleepythread")
         thread.start()
-        # wait_for_thread(thread)
-        thread_status = get_thread_status()
-        self.assertNotIn("mysupersleepythread", thread_status)
-        self.assertIn("mysupersleepyth", thread_status)
+        time.sleep(1)
+
+        self.assertEqual("mysupersleepyth", thread.os_thread_name)
         thread.join()
-        
-
-def get_thread_status():
-    s_pid = str(os.getpid())
-    thread_id = int(list(p for p in os.listdir("/proc/{}/task".format(s_pid)) if p != s_pid)[0])
-    with open("/proc/{}/task/{}/status".format(s_pid, thread_id), mode="r") as f:
-        return f.read()
 
 
-def wait_for_thread(thread_obj):
-    for i in range(10):
-        if thread_obj.is_alive():
-            return
-        time.sleep(0.1)
-    assert False
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

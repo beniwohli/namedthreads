@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from distutils.sysconfig import get_python_lib
 
 with open('README.md') as f:
